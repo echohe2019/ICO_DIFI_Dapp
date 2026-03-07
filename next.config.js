@@ -1,9 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    appDir: false, // Keep this false for pages directory
-    esmExternals: "loose", // This helps with ESM/CommonJS compatibility
-  },
+  // Next.js 14 不再需要 appDir 配置，默认使用 pages 目录
   transpilePackages: [
     "@vanilla-extract/sprinkles",
     "@rainbow-me/rainbowkit",
@@ -25,6 +22,7 @@ const nextConfig = {
       zlib: false,
       path: false,
       os: false,
+      "@react-native-async-storage/async-storage": false,
     };
 
     // Fix for ESM/CommonJS compatibility
@@ -49,10 +47,14 @@ const nextConfig = {
       type: "javascript/auto",
     });
 
+    // Fix for @base-org/account import syntax
+    config.module.noParse = [
+      ...(config.module.noParse || []),
+      /@base-org\/account/,
+    ];
+
     return config;
   },
-  // If you're using static export
-  trailingSlash: true,
   images: {
     unoptimized: true,
   },

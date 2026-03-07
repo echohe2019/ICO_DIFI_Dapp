@@ -1,18 +1,18 @@
-import Header from "../HomePage/Header";
-import HeroSection from "../HomePage/HeroSection";
-import Footer from "../HomePage/Footer";
-import BlockchainFeatures from "../HomePage/BlockchainFeatures";
-import BrandSlider from "../HomePage/BrandSlider";
-import BlockchainFeaturesGrid from "../HomePage/BlockchainFeaturesGrid";
-import RoadmapComponent from "../HomePage/RoadmapComponent";
-import TokenomicsComponent from "../HomePage/TokenomicsComponent";
-import FAQComponent from "../HomePage/FAQComponent";
-import HeroCTAComponent from "../HomePage/HeroCTAComponent";
-import VideoCardSlider from "../HomePage/VideoCardSlider";
-import FooterComponent from "../HomePage/FooterComponent";
-import DecentralizedPlatform from "../HomePage/DecentralizedPlatform";
-import TestimonialsSlider from "../HomePage/TestimonialsSlider";
-import ReferralPopup from "../HomePage/ReferralPopup";
+import Header from "./Header";
+import HeroSection from "./HeroSection";
+import Footer from "./Footer";
+import BlockchainFeatures from "./BlockchainFeatures";
+import BrandSlider from "./BrandSlider";
+import BlockchainFeaturesGrid from "./BlockchainFeaturesGrid";
+import RoadmapComponent from "./RoadmapComponent";
+import TokenomicsComponent from "./TokenomicsComponent";
+import FAQComponent from "./FAQComponent";
+import HeroCTAComponent from "./HeroCTAComponent";
+import VideoCardSlider from "./VideoCardSlider";
+import FooterComponent from "./FooterComponent";
+import DecentralizedPlatform from "./DecentralizedPlatform";
+import TestimonialsSlider from "./TestimonialsSlider";
+import ReferralPopup from "./ReferralPopup";
 
 export {
   Header,
