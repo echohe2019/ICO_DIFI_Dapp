@@ -18,8 +18,8 @@ export const handleTransactionError = (
   const isRejected =
     (error?.message && error.message.includes("user rejected")) ||
     error.message.includes("rejected transaction") ||
-    rror.message.includes("User denied") ||
-    rror.message.includes("ACTION_REJECTED");
+    error.message.includes("User denied") ||
+    error.message.includes("ACTION_REJECTED");
 
   if (isRejected || code == "ACTION_REJECTED" || code === 4001) {
     errorMessage = "Transaction Rejected by user";
@@ -41,11 +41,22 @@ export const handleTransactionError = (
     } else if (message.includes("replacement transaction underpriced")) {
       errorMessage = "Gas price too low to replace pending transaction";
       errorCode = "GAS_PRICE_ERROR";
+    } else if (message.includes("Failed to fetch")) {
+      errorMessage =
+        "Network connection failed. Please check your internet connection and try again.";
+      errorCode = "NETWORK_ERROR";
+    } else if (
+      message.includes("CORS") ||
+      message.includes("Access-Control-Allow-Origin")
+    ) {
+      errorMessage =
+        "CORS policy error. Please try using a different RPC endpoint or check your network settings.";
+      errorCode = "CORS_ERROR";
     } else {
       errorMessage = message;
     }
   }
-  return { message, errorMessage, code: errorCode };
+  return { message: errorMessage, code: errorCode };
 };
 
 export const erc20Abi = [

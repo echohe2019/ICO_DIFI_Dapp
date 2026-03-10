@@ -11,14 +11,12 @@ import {
   erc20Abi,
   generateId,
 } from "@/context/Utility";
-import tokenCalculator from "@/components/TokenCalculator/TokenCalculator";
 
 const LINKTUM_ADDRESS = process.env.NEXT_PUBLIC_TOKEN_LINKTUM_ADDRESS;
 const CURRENCY = process.env.NEXT_PUBLIC_CURRENCY;
 const TOKEN_SYMBOL = process.env.NEXT_PUBLIC_TOKEN_SYMBOL;
-const TOKEN_DECIMALS = process.env.NEXT_PUBLIC_TOKEN_DECIMALS;
+const TOKEN_DECIMALS = process.env.NEXT_PUBLIC_TOKEN_DECIMAL;
 const TOKEN_LOGO = process.env.NEXT_PUBLIC_TOKEN_LOGO;
-const DOMAIN_URL = process.env.NEXT_PUBLIC_DOMAIN_URL;
 const PER_TOKEN_USD_PRICE = process.env.NEXT_PUBLIC_PER_TOKEN_USD_PRICE;
 
 const TokenICOAbi = TOKEN_ICO_ABI.abi;
@@ -26,21 +24,22 @@ const TokenICOAbi = TOKEN_ICO_ABI.abi;
 const Web3Context = createContext();
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_TOKEN_ICO_ADDRESS;
-const RPC_URL = process.env.NEXT_PUBLIC_TOKEN_RPC_URL;
+// const RPC_URL = process.env.NEXT_PUBLIC_TOKEN_RPC_URL;
 
-const fallbackProvider = new ethers.providers.JsonRpcProvider(RPC_URL);
+// const fallbackProvider = new ethers.providers.JsonRpcProvider(RPC_URL);
 
 export const Web3Provider = ({ children }) => {
-  const notify = useToast();
+  const { notify } = useToast();
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const { balance } = useBalance({ address }); // 修复：使用 address 而不是 config
+  const { balance } = useBalance({ config }); // 修复：使用 address 而不是 config
   const { connect, connector } = useConnect();
   const [reCall, setReCall] = useState(0);
   const [globalLoad, setGlobalLoad] = useState(false);
 
   const provider = useEthersProvider();
   const signer = useEthersSigner();
+  // const fallbackProvider = new ethers.providers.JsonRpcProvider(RPC_URL);
 
   const [contract, setContract] = useState(null);
   const [account, setAccount] = useState(null);
@@ -53,7 +52,7 @@ export const Web3Provider = ({ children }) => {
   });
   const [tokenBalance, setTokenBalance] = useState({
     userTbcBalance: "0",
-    contractEthBalance: "0",
+    contractEthBalance: null,
     totalSupply: null,
     userEthBalance: null,
     ethPrice: "0",
@@ -78,7 +77,6 @@ export const Web3Provider = ({ children }) => {
         }
       }
     };
-
     initContract();
   }, [provider, signer]);
 
@@ -87,49 +85,14 @@ export const Web3Provider = ({ children }) => {
       setGlobalLoad(true);
       try {
         const currentProvider = provider || fallbackProvider;
-
-        // First check if saleToken is set
         const readonlyContract = new ethers.Contract(
           CONTRACT_ADDRESS,
           TokenICOAbi,
           currentProvider,
         );
-
-        const saleTokenAddress = await readonlyContract.saleToken();
-
-        if (saleTokenAddress === ethers.constants.AddressZero) {
-          // Sale token not set, use default values
-          const [userEthBalance, contractEthBalance] = await Promise.all([
-            address
-              ? currentProvider.getBalance(address)
-              : ethers.utils.parseEther("0"),
-            currentProvider.getBalance(CONTRACT_ADDRESS),
-          ]);
-
-          setContractInfo({
-            tbcAddress: null,
-            tbcBalance: "0",
-            ethPrice: "0",
-            totalSold: "0",
-          });
-
-          setTokenBalance({
-            userTbcBalance: "0",
-            contractEthBalance: ethers.utils.formatUnits(contractEthBalance),
-            totalSupply: "0",
-            userEthBalance: ethers.utils.formatUnits(userEthBalance),
-            ethPrice: "0",
-            tbcBalance: "0",
-          });
-
-          setGlobalLoad(false);
-          return;
-        }
-
-        // Sale token is set, fetch contract info
         const info = await readonlyContract.getContractInfo();
+        console.log("info:", info);
         const tokenDecimals = parseInt(info.tokenDecimals) || 18;
-
         setContractInfo({
           tbcAddress: info.tokenAddress,
           tbcBalance: ethers.utils.formatUnits(
@@ -139,96 +102,57 @@ export const Web3Provider = ({ children }) => {
           ethPrice: ethers.utils.formatUnits(info.ethPrice, 18),
           totalSold: ethers.utils.formatUnits(info.totalSold, tokenDecimals),
         });
-
-        let tokenContract = null;
         if (address && info.tokenAddress) {
-          tokenContract = new ethers.Contract(
+          const tokenContract = new ethers.Contract(
             info.tokenAddress,
             erc20Abi,
             currentProvider,
           );
-        }
-
-        // Only fetch token-related data if we have a token contract
-        let userTokenBalance = ethers.utils.parseUnits("0", tokenDecimals);
-        let totalSupply = ethers.utils.parseUnits("0", tokenDecimals);
-
-        if (tokenContract && address) {
-          const tokenData = await Promise.all([
+          const [
+            userTokenBalance,
+            userEthBalance,
+            contractEthBalance,
+            totalSupply,
+          ] = await Promise.all([
             tokenContract.balanceOf(address),
+            currentProvider.getBalance(address),
+            currentProvider.getBalance(CONTRACT_ADDRESS),
             tokenContract.totalSupply(),
           ]);
-          userTokenBalance = tokenData[0];
-          totalSupply = tokenData[1];
+
+          setTokenBalance((prev) => ({
+            ...prev,
+            userTbcBalance: ethers.utils.formatUnits(
+              userTokenBalance,
+              tokenDecimals,
+            ),
+            contractEthBalance: ethers.utils.formatUnits(contractEthBalance),
+            totalSupply: ethers.utils.formatUnits(totalSupply, tokenDecimals),
+            userEthBalance: ethers.utils.formatUnits(userEthBalance, 18),
+            ethPrice: ethers.utils.formatUnits(info.ethPrice, 18),
+            tbcBalance: ethers.utils.formatUnits(
+              info.tokenBalance,
+              tokenDecimals,
+            ),
+          }));
         }
-
-        // Always fetch ETH balances
-        const [userEthBalance, contractEthBalance] = await Promise.all([
-          address
-            ? currentProvider.getBalance(address)
-            : ethers.utils.parseEther("0"),
-          currentProvider.getBalance(CONTRACT_ADDRESS),
-        ]);
-
-        setTokenBalance({
-          userTbcBalance: ethers.utils.formatUnits(
-            userTokenBalance,
-            tokenDecimals,
-          ),
-          contractEthBalance: ethers.utils.formatUnits(contractEthBalance),
-          totalSupply: ethers.utils.formatUnits(totalSupply, tokenDecimals),
-          userEthBalance: ethers.utils.formatUnits(userEthBalance),
-          ethPrice: ethers.utils.formatUnits(info.ethPrice, 18),
-          tbcBalance: ethers.utils.formatUnits(
-            info.tokenBalance,
-            tokenDecimals,
-          ),
-        });
-
         setGlobalLoad(false);
       } catch (error) {
         setGlobalLoad(false);
         console.error("Error fetching contract info: ", error);
-
-        // Set default values on error
-        try {
-          const currentProvider = provider || fallbackProvider;
-          const [userEthBalance, contractEthBalance] = await Promise.all([
-            address
-              ? currentProvider.getBalance(address)
-              : ethers.utils.parseEther("0"),
-            currentProvider.getBalance(CONTRACT_ADDRESS),
-          ]);
-
-          setContractInfo({
-            tbcAddress: null,
-            tbcBalance: "0",
-            ethPrice: "0",
-            totalSold: "0",
-          });
-
-          setTokenBalance({
-            userTbcBalance: "0",
-            contractEthBalance: ethers.utils.formatUnits(contractEthBalance),
-            totalSupply: "0",
-            userEthBalance: ethers.utils.formatUnits(userEthBalance),
-            ethPrice: "0",
-            tbcBalance: "0",
-          });
-        } catch (balanceError) {
-          console.error("Error fetching balances: ", balanceError);
-        }
+        setError("Failed to fetch contract info");
       }
     };
     fetchContractInfo();
-  }, [contract, address, provider, signer, reCall, fallbackProvider]);
+  }, [contract, address, provider, signer, reCall]);
 
   const buyToken = async (ethAmount) => {
     if (!contract || !address) return null;
     const toastId = notify.start(`Buying ${TOKEN_SYMBOL} with ${CURRENCY}...`);
     try {
       const ethValue = ethers.utils.parseEther(ethAmount);
-      const tx = await contract.buyToken({
+      console.log("ethValue", ethValue);
+      const tx = await contract.buyTokens({
         value: ethValue,
       });
       notify.update(toastId, "Processing", "Waiting for confirmation");
@@ -323,12 +247,18 @@ export const Web3Provider = ({ children }) => {
       return null;
     }
   };
-  const setSaleToken = async (tokenAddress) => {
+  const setSaleToken = async (tokenAddress, retryCount = 0) => {
     if (!contract || !address) return null;
 
     const toastId = notify.start(`Setting sale token`);
 
     try {
+      // 验证地址格式
+      if (!ethers.utils.isAddress(tokenAddress)) {
+        notify.fail(toastId, "Invalid token address format");
+        return null;
+      }
+
       const tx = await contract.setSaleToken(tokenAddress);
       notify.update(toastId, "Processing", "Confirming token update...");
       const receipt = await tx.wait();
@@ -342,10 +272,33 @@ export const Web3Provider = ({ children }) => {
         error,
         "Setting sale token",
       );
+
       if (errorCode == "ACTION_REJECTED") {
         notify.reject(toastId, "Transaction rejected by user");
         return null;
+      } else if (errorCode == "CORS_ERROR") {
+        notify.fail(
+          toastId,
+          "CORS policy error. Please check your RPC endpoint settings or try a different network.",
+        );
+        return null;
+      } else if (errorCode == "NETWORK_ERROR" && retryCount < 2) {
+        notify.update(
+          toastId,
+          "Retrying",
+          `Network error, retrying... (${retryCount + 1}/2)`,
+        );
+        // 等待 2 秒后重试
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        return setSaleToken(tokenAddress, retryCount + 1);
+      } else if (errorCode == "NETWORK_ERROR") {
+        notify.fail(
+          toastId,
+          "Network connection failed after 3 attempts. Please check your network and try again.",
+        );
+        return null;
       }
+
       console.error(errorMessage);
       notify.fail(toastId, "Failed to set sale token,Please check the address");
       return null;
@@ -433,38 +386,116 @@ export const Web3Provider = ({ children }) => {
     return ethers.utils.formatUnits(amount, decimals);
   };
 
-  const addTokenToMetamask = async (tokenAddress) => {
-    const toastId = notify.start(`Adding ${TOKEN_SYMBOL} token to Metamask`);
-    try {
-      const wasAdded = await window.ethereum.request({
-        method: "wallet_watchAsset",
-        params: {
-          type: "ERC20",
-          options: {
-            address: LINKTUM_ADDRESS,
-            symbol: TOKEN_SYMBOL,
-            decimals: TOKEN_DECIMALS,
-            image: TOKEN_LOGO,
-          },
-        },
-      });
-      if (wasAdded) {
-        notify.complete(toastId, `Successfully added token to Metamask`);
-      } else {
-        notify.complete(toastId, "Failed to add the token to Metamask");
-      }
-    } catch (error) {
-      console.error(error);
-      const { message: errorMessage, code: errorCode } = handleTransactionError(
-        error,
-        "Token additin error",
-      );
-      notify.fail(
-        toastId,
-        `Transaction failed:${errorMessage.message === "undefined" ? "Not Supported" : errorMessage.message}`,
-      );
+  // const addTokenToMetamask = async () => {
+  //   const toastId = notify.start(`Adding ${TOKEN_SYMBOL} Token to Metamask`);
+  //   try {
+  //     const wasAdded = await window.ethereum.request({
+  //       method: "wallet_watchAsset",
+  //       params: {
+  //         type: "ERC20",
+  //         options: {
+  //           address: LINKTUM_ADDRESS,
+  //           symbol: TOKEN_SYMBOL,
+  //           decimals: TOKEN_DECIMALS,
+  //           image: TOKEN_LOGO,
+  //         },
+  //       },
+  //     });
+  //     if (wasAdded) {
+  //       notify.complete(toastId, `Successfully added token to Metamask`);
+  //     } else {
+  //       notify.complete(toastId, "Failed to add the token to Metamask");
+  //     }
+  //   } catch (error) {
+  //     console.error(error);
+  //     const { message: errorMessage, code: errorCode } = handleTransactionError(
+  //       error,
+  //       "Token additin error",
+  //     );
+  //     notify.fail(
+  //       toastId,
+  //       `Transaction failed:${errorMessage.message === "undefined" ? "Not Supported" : errorMessage.message}`,
+  //     );
+  //   }
+  // };
+
+    const addTokenToMetamask = async (tokenAddress = LINKTUM_ADDRESS) => {
+        const toastId = notify.start(`Adding ${TOKEN_SYMBOL} Token to MetaMask`);
+        
+        try {
+            // 检查 MetaMask 是否可用
+            if (!window.ethereum || !window.ethereum.isMetaMask) {
+                throw new Error("MetaMask is not installed");
+            }
+            
+            // 检查是否已连接钱包
+            if (!address) {
+                throw new Error("Please connect your wallet first");
+            }
+            
+            // 验证参数
+            if (!tokenAddress || !ethers.utils.isAddress(tokenAddress)) {
+                throw new Error("Invalid token address");
+            }
+            
+            if (!TOKEN_SYMBOL || TOKEN_SYMBOL.trim() === "") {
+                throw new Error("Token symbol is not configured");
+            }
+            
+            const decimals = parseInt(TOKEN_DECIMALS || "18");
+            if (isNaN(decimals) || decimals < 0 || decimals > 36) {
+                throw new Error("Invalid token decimals");
+            }
+            
+            // 准备代币参数
+            const tokenParams = {
+                type: "ERC20",
+                options: {
+                    address: tokenAddress,
+                    symbol: TOKEN_SYMBOL,
+                    decimals: decimals,
+                    image: TOKEN_LOGO || undefined, // 可选参数
+                },
+            };
+            
+            console.log("Adding token to MetaMask with params:", tokenParams);
+            
+            // 调用 MetaMask API
+            const wasAdded = await window.ethereum.request({
+                method: "wallet_watchAsset",
+                params: tokenParams,
+            });
+            
+            if (wasAdded) {
+                notify.complete(toastId, `✅ ${TOKEN_SYMBOL} token successfully added to MetaMask!`);
+                return true;
+            } else {
+                notify.complete(toastId, `⚠️ User canceled adding ${TOKEN_SYMBOL} token`);
+                return false;
+            }
+            
+        } catch (error) {
+            console.error("Error adding token to MetaMask:", error);
+            
+            let errorMessage = "Failed to add token to MetaMask";
+            
+            // 处理特定错误类型
+            if (error.code === 4001 || error.message?.includes("user rejected")) {
+                errorMessage = "User rejected the token addition request";
+            } else if (error.code === -32602) {
+                errorMessage = "Invalid token parameters. Please check token configuration.";
+            } else if (error.message?.includes("MetaMask is not installed")) {
+                errorMessage = "MetaMask extension not found. Please install MetaMask.";
+            } else if (error.message?.includes("connect your wallet")) {
+                errorMessage = "Please connect your wallet before adding tokens.";
+            } else if (error.message?.includes("Invalid token address")) {
+                errorMessage = "The token address is invalid. Please check the configuration.";
+            }
+            
+            notify.fail(toastId, `❌ ${errorMessage}`);
+            return false;
+        }
     }
-  };
 
   const value = {
     provider,

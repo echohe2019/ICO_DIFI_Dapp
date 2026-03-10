@@ -57,3 +57,5 @@ const HERO_3 = (
     />
   </svg>
 );
+
+export { HEADER_1, HERO_1, HERO_2, HERO_3 };
